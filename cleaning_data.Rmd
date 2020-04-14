@@ -1,0 +1,91 @@
+---
+title: "Cleaning Data"
+output: html_notebook
+---
+
+The purpose of this R markdown is to clean the data produced from "checkTheseList.Rmd" to prepare it for calculating species accumulation curve, species richness, diversity, and other measurements. 
+
+```{r}
+rm(list = ls())
+library(dplyr)
+library(magrittr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+
+library(readr)
+DF <- read_csv("~/Dropbox/Zooniverse_work/files for kate/Zooniverse-work-final/Zoo-Data-Wrangling/Data/north-country-wild-classifications.03.16.20-flattened.csv")
+
+#all_data <- read_csv("~/Documents/Kate_ThesisCode/Good_Votes.csv") #This includes only the classifications we are certain about
+#all_data<- read_csv("~/Documents/Kate_ThesisCode/cleaned_data.csv") #This is the data frame for all of the classifications including the ones we need to classify ourselves. 
+all_data<- read_csv("~/Documents/Kate_ThesisCode/all_data.csv") #This is the df for all corrected classifications, including ones we corrected manually.
+
+```
+
+
+```{r}
+Final_data <- all_data %>% group_by(subject_ids)
+```
+
+
+Match the forest type with subject ID
+```{r}
+Sifted_data<- DF[match(unique(DF$subject_ids), DF$subject_ids),]
+
+#write.csv(Sifted_data, file = "Sifted_data.csv")
+```
+
+```{r}
+duplicated(Final_data$subject_ids)
+length(Final_data$subject_ids)
+
+
+```
+
+The final data frame did not contain dates. We need to add these in. 
+```{r}
+Metadata <- read.csv("~/Dropbox/Zooniverse_work/Game Camera Metadata Field Sheets 2019.csv")
+
+Metadata1<- select(Metadata, Date.Out, Date.Checked, SD.Card.Number, Unit.Number) 
+
+names(Metadata1)<- c("Date_Out", "Date_Checked", "SDCard", "Camera")
+
+
+```
+
+
+
+Import final dataset to add dates column. We need to add date in the field and date retrieved in order to calculate species accumulation curve. 
+```{r}
+Sifted_data1<-select(Sifted_data, "subject_ids", "Imj1", "Imj2", "Img3", "CamNum", "SD_card_num", "ForestType", "ForestName")
+
+Sifted_data1<-arrange(Sifted_data1, desc(subject_ids))
+all_data<-arrange(all_data, desc(subject_ids))
+
+Sifted_data1<-Sifted_data1[order(Sifted_data1$subject_ids),]
+all_data<-all_data[order(all_data$subject_ids),]
+
+joinedData<- merge(all_data, Sifted_data1, by = 'subject_ids')
+#Diff_species column is not quite right, but everything else appears to be correct.
+
+#Be sure the merging columns have the same names and are both characters
+
+#Data_Clean_up$CamNum<- as.character(Data_Clean_up$CamNum)
+#Data_Clean_up$SD_card_num<- as.character(Data_Clean_up$SD_card_num)
+joinedData$CamNum<- as.character(joinedData$CamNum)
+joinedData$SD_card_num<- as.character(joinedData$SD_card_num)
+library(data.table)
+setnames(joinedData, old=c("CamNum","SD_card_num"), new=c("Camera", "SDCard"))
+Metadata1$Camera<-as.character(Metadata1$Camera)
+Metadata1$SDCard<-as.character(Metadata1$SDCard)
+
+
+
+joinFinal <- left_join(joinedData, Metadata1, by=c("SDCard", "Camera"), type='right', match='all') 
+
+
+write.csv(joinFinal, file = "joinedData.csv")
+```
+
+This seemed to match the correct deployment and collection date for each subject_id. Now we can do a species accumulation curve. 
+

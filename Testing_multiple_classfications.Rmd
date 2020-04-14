@@ -15,7 +15,7 @@ library(tidyr)
 library(ggplot2)
 
 library(readr)
-DF <- read_csv("~/Dropbox/R/Zooniverse_work/dummy_flattened_to_clean.csv")
+DF <- read_csv("~/Dropbox/Zooniverse_work/files for kate/Zooniverse-work-final/Zoo-Data-Wrangling/Data/north-country-wild-classifications.03.16.20-flattened.csv")
 ```
 
 # note that the total_species count reported here isn't accurate when users report the same species multiple times. 
@@ -201,16 +201,19 @@ calc_prop <- function(x, NA_action = "non_answer") {
 multi_answer_votes <- grouped_classifications %>%
      summarise_at(., .vars = multi_answer_cols, funs(calc_prop))
 
+#Do not need to use this code right now. The data frame "species_votes" has the choices, proportions of votes, and total number of species identified per event. Only need to join it with "multi_answer_votes" and then create a checklist of flagged subjects for us to score ourselves.
 howmany_votes <- grouped_classifications %>%
-     mutate(Number = dplyr::recode(as.character(Number), '1' = '1', '2' = '2', '35' = '4', '610' = '8', 'MANY' = '20')) %>%
-     mutate(Number = as.numeric(Number)) %>%
+     mutate("Number" = dplyr::recode(as.character("Number"), '1' = '1', '2' = '2', '35' = '4', '610' = '8', 'MANY' = '20')) %>%
+     mutate("Number" = as.numeric("Number")) %>%
      summarise_at(., .vars = howmany_column, funs(med_count = median, min_count = min, max_count = max))
 ```
 
 
 # Okay, so the full dataset has all of the aggregate votes per species. The only thing left is to select the top n species for each subject.
 ```{r}
-all_data <- full_join(species_votes, howmany_votes) %>% full_join(., multi_answer_votes)
+#all_data <- full_join(species_votes, howmany_votes) %>% full_join(., multi_answer_votes)
+
+all_data<- full_join(species_votes, multi_answer_votes)
 
 write.csv(all_data, file = "cleaned_data.csv")
 ```

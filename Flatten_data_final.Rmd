@@ -38,6 +38,7 @@ Now list all the functions in a folder and source them all
 my_path<-"Functions/" #path to folder full of functions each in a .R file
 source_files<-list.files(my_path, "*.R") #lists all the files in th folder
 map(paste0(my_path, source_files), source) #now sources all of the files
+source('~/Documents/Kate_ThesisCode/our_functions.R')
 ```
 
 ###Step 1. Isolating the data to a single workflow and version number
@@ -46,8 +47,8 @@ A zooniverse project can have multiple work flows, and each workflow can have mu
 ####Specify Project
 Give the project a name and id the classifications file
 ```{r}
-#path to whatever file you want - change path accordingly
-classifications_file<-"Data/north-country-wild-classifications.03.16.20.csv"
+#path to whatever file you want - change path accordingly. I chose a path outside of my Git Repository because this file is too large and would have crashed the system.
+classifications_file<-"~/Dropbox/Zooniverse_work/files for kate/Zooniverse-work-final/Zoo-Data-Wrangling/Data/north-country-wild-classifications.03.16.20.csv"
 
 ```
 ####Examine data

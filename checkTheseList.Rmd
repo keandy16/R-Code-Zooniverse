@@ -1,0 +1,131 @@
+---
+title: "Check_These_List"
+output: html_notebook
+---
+
+The purpose of this R Markdown is to create a checklist table for us to go back and review photos again that volunteers were not able to clearly classify. 
+
+```{r}
+rm(list = ls())
+
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+
+library(readr)
+DF <- read_csv("~/Documents/Kate_ThesisCode/cleaned_data.csv")
+```
+
+
+Now filter the data frame to find duplicate subjects. This will eliminate the subjects where everyone voted for the same species
+
+```{r}
+#This extracts all subjects that have a propclass >= 0.80. This includes all duplicate subject_ids that had more than one classification (eg. human and dog) as well as the single subject for classifications with a propclass of 0.80. 
+DF1<- DF %>% 
+  group_by(subject_ids) %>% 
+  filter(propclass >=0.80)
+
+#These are the subjects that were correctly classified by volunteers.
+write.csv(DF1, file = "Good_Votes.csv")
+
+```
+
+Now find the 'bad' subjects or the subjects that we need to manually classify. We will start by extracting all the duplicates and their originals in order to figure out which ones have a propclass of <0.80.
+```{r}
+#This works! This grabs all duplicates and their originals.  
+filtered_df <- DF %>%
+               group_by(subject_ids) %>%
+               filter(n()>1)
+```
+
+The next step is to sort through "filtered_df" and select the classification with the most votes. Classifications with >80% proportion of votes will be selected as that identification. Anything less than that we will have to manually go through and identify ourselves.In this segment of code, we will identify the subject_ids that we do not need to manually classify (propclass 0.80) and remove them from filtered_df. What will be left are all the subject_ids that we need to classify. 
+
+```{r}
+#Check to see how many unique subject_ids we have in our new data frame
+check<- unique(filtered_df$subject_ids)
+
+filtered_df<-arrange(filtered_df, desc(propclass)) #This step is important here. Not entirely sure why it has to work here, but you must do this step before the next one.
+
+#Create a new data frame that contains only the subject_ids with propclass>=0.80. We do not need to check these subjects.
+class<- filtered_df%>% 
+  group_by(subject_ids)%>% 
+     filter (propclass>=0.80) #This gives us all the subject_ids with propclass>=0.80. 
+
+
+#Eliminate subjects that volutneers have classified with certainty (propclass>=0.80)
+dumpthese<-class$subject_ids
+filtered_df1<-filtered_df[ ! filtered_df$subject_ids %in% dumpthese, ]
+
+
+```
+
+Now we have a data frame that contains subject_ids that we need to manually check and identify ourselves. Next we need to join image names to the subject_ids so we can go back to the photos and manually identify.
+
+```{r}
+#Import original DF with image names to join to filtered_df
+Original <- read_csv("~/Dropbox/Zooniverse_work/files for kate/Zooniverse-work-final/Zoo-Data-Wrangling/Data/north-country-wild-classifications.03.16.20-flattened.csv")
+
+#Select subject_ids and image names columns from Original
+Original1<-select(Original, subject_ids, Imj1, Imj2, Img3)
+
+#There were issues with simply merging the two data frames because there are duplicates from both data frames that need to be corrected. This code corrects any duplicates in subject_id to prepare for merging.
+CheckThese<-select(filtered_df1, subject_ids)
+CheckThese<-arrange(CheckThese, desc(subject_ids))
+CheckThese<- distinct(CheckThese, subject_ids, .keep_all = TRUE)#These three lines of code get the unique subject ids to merge with Original1.
+Original1<-arrange(Original1, desc(subject_ids))
+Original1<-distinct(Original1, subject_ids, .keep_all = TRUE)
+
+#Merge Original1 and CheckThese by subject_ids
+CheckTheseFinal<-merge(Original1, CheckThese, by= "subject_ids")
+
+```
+
+This works! The output from this script is a csv file of the subject_ids that need to be manually checked by us and the accompanying images to help us find which photos to look at. 
+
+```{r}
+write.csv(CheckTheseFinal, file = "checkthese.csv")
+
+#The first time doing this I had a few errors in the code and produced a checkthese list that was much larger than it was supposed to be. That file is called "checkthese" and "checkthesecorrect." Once I figured this out, I redid my work and named the correct file to "keepthese." When you run this code again, keep the names I have originally written because the code is fixed, but for the sake of this particular script, I am importing the csv "keepthese."
+```
+
+
+Manually correct the "checkthese.csv" and be sure to keep the same format and notation (all capital letters, column headings, etc). Rename the file to "checkthesecorrect.csv" and upload here again to merge to the "Good_Votes.csv". This will give us a master dataframe to work with to do forest calculations. 
+```{r}
+#checkthesecorrect <- read_csv("~/Documents/Kate_ThesisCode/checkthesecorrect.csv")
+
+checkthesecorrect <- read_csv("~/Documents/Kate_ThesisCode/keepthese.csv")
+
+Good_Votes <- read_csv("~/Documents/Kate_ThesisCode/Good_Votes.csv")
+```
+
+Add in a diff_species column 
+```{r}
+checkthesecorrect <- checkthesecorrect %>%
+     group_by(., subject_ids) %>%
+     mutate(., diff_species = n_distinct(choice))
+```
+
+Now cut out the unnecessary columns from Good_Votes before merging.
+```{r}
+Good_Votes1<-select(Good_Votes, "subject_ids","diff_species","choice")
+checkthesecorrect1<-select(checkthesecorrect, "subject_ids","diff_species","choice")
+```
+
+Combine "Good_Votes1" and "checkthesecorrect1"
+```{r}
+#Need to make sure all columns have character variables
+checkthesecorrect1$subject_ids<-as.character(checkthesecorrect1$subject_ids)
+checkthesecorrect1$diff_species<-as.character(checkthesecorrect1$diff_species)
+checkthesecorrect1$choice<-as.character(checkthesecorrect1$choice)
+Good_Votes1$subject_ids<-as.character(Good_Votes1$subject_ids)
+Good_Votes1$diff_species<-as.character(Good_Votes1$diff_species)
+Good_Votes1$choice<-as.character(Good_Votes1$choice)
+
+#bind the rows to concatenate the DFs 
+all_data<-bind_rows(Good_Votes1,checkthesecorrect1)
+
+write.csv(all_data, file = "all_data.csv")
+```
+
