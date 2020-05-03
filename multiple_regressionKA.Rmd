@@ -1,0 +1,31 @@
+---
+title: "MultipleRegression.Rmd"
+author: "Erika"
+date: "4/27/2020"
+output: html_document
+---
+
+Looking at methods for multiple regression modeling for Kate's camera trap data and Leslie's forest data.
+
+set up the workspace
+```{r}
+rm(list = ls())
+library(dplyr)
+library(ggplot2)
+
+```
+Load the draft data
+```{r}
+KA<-read.csv("~/Documents/Kate_ThesisCode/Covariates.csv")
+
+LS<-read.csv("/Users/ebar/Dropbox/1Courses/ResearchGroup/2019-2020/Leslie/SYEvariables.csv")
+```
+Now try a model.
+
+```{r}
+K1<-glm(SpecRichness ~ ForestType + RoadDensity50 + PlotSize50 + RoadDensity100, PlotSize100 +P_Deciduous50 + P_Deciduos100, family = gaussian, data = KA)
+
+summary(K1)
+```
+
+

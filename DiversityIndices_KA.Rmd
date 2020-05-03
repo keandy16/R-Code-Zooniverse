@@ -1,38 +1,47 @@
 ---
 title: "Shannon and Simpson’s indices"
-author: "Erika"
+author: "Erika and Kate"
 date: "4/25/2019"
 output: html_document
 ---
-We'd like to cacluate Shannon and Simpon indices for the winter 2018-2019 camera trap data.
+We'd like to calculate the Shannon, Simpon, and inverse Simpson indices for the 2018-2020 camera trap data. We will be calculating the diversity per camera per season and per forest (the average diversity of the cameras in the forest across all seasons). 
+
+Simpson's Index (D) measures the probability that two individuals randomly selected from a sample will belong to the same species. 
+
+Inverse Simpson's Index measures true diversity from the Simpson's Index.
+
+Shannon Index is a typical diversity index that accounts for species richness and evenness.
 
 Set up workspace
 ```{r setup, include=FALSE}
 rm(list = ls())
 library(dplyr)
 library(ggplot2)
+library(ggpubr)
 library(readr)
 ```
 
 Now load "raw" camera trap data
 ```{r}
-DF <- read_csv("~/Dropbox/Zooniverse_work/Kate/Gus.csv")
+DF<- read_csv("~/Documents/Kate_ThesisCode/dataFinal.csv")
+
 ```
-Now get rid of the "NOTHINGHERE" and "SOMETHINGHERE" since they provide no species information.
+Now get rid of the "NOTHINGHERE" and "SOMETHINGHERE" and other species that are not mammals since they provide no species information.
 
 ```{r}
-dump<-which(DF$choice == "NOTHINGHERE" | DF$choice == "SOMETHINGHERE" | DF$choice == "HUMAN")
+dump<-which(DF$choice == "NOTHINGHERE" | DF$choice == "SOMETHINGHERE" | DF$choice == "HUMAN" | DF$choice == "GROUSERUFFED" | DF$choice == "CROWORRAVEN" | DF$choice == "OTHERBIRD" | DF$choice == "DOMESTICDOG" | DF$choice == "OWL" | DF$choice == "BLUEJAY" | DF$choice == "TURKEY" | DF$choice == "GOOSEWILD")
 
 #now dump
 DF<-DF[-dump,]
 ```
+
 Next, we need to create a matrix or df of sites on rows and species on columns with cells equal to # of events.
 
 Summarize by species and forest and return # of events.
 
 ```{r}
-diversity<-DF %>% group_by(ForestName, choice) %>% summarize(
-	NumEvents = length(Camera)
+diversity<-DF %>% group_by(ForestName, choice) %>% summarise(
+	NumEvents = length(CamNum)
 )
 ```
 Now we need to format diversity for vegan.
@@ -62,6 +71,8 @@ Do the same for the simpson's index (similarity index- take 1-S to find diversit
 ```{r}
 div_simp<- diversity(vegReady, index = "simpson")
 div_simp
+
+inv_simp<- diversity(vegReady, index = "invsimpson")
 ```
 
 Plot the two indices, bar graph of all forest sites. Box plot for two forest types. 
@@ -85,6 +96,7 @@ ggplot(shanDiv, aes(x= Forest, y = div_shan, group = Type, color = Type)) +
      
 
 ggsave("Shannon_Diversity_Index.jpg", device= "jpg")
+write.csv(shanDiv, file = "shanDiv.csv")
 ```
 
 Do the same for Simpson's Index
@@ -99,15 +111,586 @@ ggplot(simpDiv, aes(x= Forest, y = div_simp, group = Type, color = Type)) +
      ylab("Simpson's Diversity Index")
 
 ggsave("Simpson's_Diversity_Index.jpg", device = "jpg")
+write.csv(simpDiv, file = "simpDiv.csv")
 ```
 
-Calculations to find the standard deviation and mean for species richness in deciduous study sites. 
+Inverse Simpson's Index
 ```{r}
-specRich <- read_csv("~/Dropbox/Zooniverse_work/Kate/Species Richness Test.csv")
+invSimp<-as.data.frame(cbind(inv_simp, Forest))
+invSimp$Type<- as.factor(c("D","P","D","D","P","P"))
 
-specRich1<- specRich %>% summarise(
-     meanRich = mean(SR),
-     sd = sd(SR)
+invSimp$inv_simp<- as.numeric(as.character(invSimp$inv_simp))
+ggplot(invSimp, aes(x= Forest, y = inv_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Forest") +
+     ylab("Simpson's Diversity Index")
+
+ggsave("Inv_Simpson's_Diversity_Index.jpg", device = "jpg")
+write.csv(invSimp, file = "invSimp.csv")
+```
+
+Join all data frames together to get one big one to summarise. 
+```{r}
+Forest_Div_Overall<-left_join(invSimp, shanDiv, "Forest")
+Forest_Div_Overall<- left_join(Forest_Div_Overall, simpDiv, "Forest")
+```
+
+
+
+Calculations to find the standard deviation and mean for diversity indices in deciduous and pine study sites. 
+```{r}
+target <- c("SH", "BC", "DON")
+Deciduous<- filter(Forest_Div_Overall, Forest %in% target)
+
+
+MeanDecidDiv<- Deciduous %>% summarise(
+     meaninvSimp = mean(inv_simp),
+     sdinvSimp = sd(inv_simp),
+     meansimp = mean(div_simp),
+     sdsimp= sd(div_simp),
+     meanshan = mean(div_shan),
+     sdshan= sd(div_shan)
 )
+
+pines <- c("DEG", "WF", "WHIP")
+Pines<- filter(Forest_Div_Overall, Forest %in% pines)
+
+
+MeanPineDiv<- Pines %>% summarise(
+      meaninvSimp = mean(inv_simp),
+     sdinvSimp = sd(inv_simp),
+     meansimp = mean(div_simp),
+     sdsimp= sd(div_simp),
+     meanshan = mean(div_shan),
+     sdshan= sd(div_shan)
+)
+```
+
+Now that we have identified the diversity per forest (average of cameras in forests across all seasons), we can identify the diversity per camera per season and diversity per forest per season.
+```{r}
+rm(list = ls())
+library(dplyr)
+library(ggplot2)
+library(readr)
+DF<- read_csv("~/Documents/Kate_ThesisCode/dataFinal.csv")
+
+dump<-which(DF$choice == "NOTHINGHERE" | DF$choice == "SOMETHINGHERE" | DF$choice == "HUMAN" | DF$choice == "GROUSERUFFED" | DF$choice == "CROWORRAVEN" | DF$choice == "OTHERBIRD" | DF$choice == "DOMESTICDOG" | DF$choice == "OWL" | DF$choice == "BLUEJAY" | DF$choice == "TURKEY" | DF$choice == "GOOSEWILD")
+
+#now dump
+DF<-DF[-dump,]
+```
+
+The first step is to subset the data frame to make individual data frames per round. We will use these data frames to define diversity per forest and per camera.
+```{r}
+Round1<-filter(DF, round==1)
+Round2<- filter(DF, round==2)
+Round3<- filter(DF, round==3)
+Round4<- filter(DF, round==4)
+```
+
+Calculate diversity per forest per season 
+```{r}
+diversityR1<-Round1 %>% group_by(ForestName, choice) %>% summarise(
+	NumEvents = length(CamNum)
+)
+diversityR2<-Round2 %>% group_by(ForestName, choice) %>% summarise(
+	NumEvents = length(CamNum)
+)
+diversityR3<-Round3 %>% group_by(ForestName, choice) %>% summarise(
+	NumEvents = length(CamNum)
+)
+diversityR4<-Round4 %>% group_by(ForestName, choice) %>% summarise(
+	NumEvents = length(CamNum)
+)
+
+library(tidyr)
+divVeganR1<- spread(diversityR1, choice, NumEvents)
+divVeganR2<- spread(diversityR2, choice, NumEvents)
+divVeganR3<- spread(diversityR3, choice, NumEvents)
+divVeganR4<- spread(diversityR4, choice, NumEvents)
+```
+
+Now, for vegan, replace NA's with zero and also delete the first column.
+```{r}
+#replace NAs with zeros
+divVeganR1[is.na(divVeganR1)] <- 0
+divVeganR2[is.na(divVeganR2)] <- 0
+divVeganR3[is.na(divVeganR3)] <- 0
+divVeganR4[is.na(divVeganR4)] <- 0
+
+#dump first column
+vegReadyR1<-divVeganR1[,-1]
+vegReadyR2<-divVeganR2[,-1]
+vegReadyR3<-divVeganR3[,-1]
+vegReadyR4<-divVeganR4[,-1]
+```
+
+Run the diversity function for shannon diveristy index (increases as diversity increases)
+```{r}
+div_shanR1<-diversity(vegReadyR1, index = "shannon")
+div_shanR2<-diversity(vegReadyR2, index = "shannon")
+div_shanR3<-diversity(vegReadyR3, index = "shannon")
+div_shanR4<-diversity(vegReadyR4, index = "shannon")
+```
+
+Do the same for the simpson's index (similarity index- take 1-S to find diversity index). Measurement of probability that any two randomly selected individuals from infinitely large community will belong to same species.
+```{r}
+div_simpR1<- diversity(vegReadyR1, index = "simpson")
+div_simpR2<- diversity(vegReadyR2, index = "simpson")
+div_simpR3<- diversity(vegReadyR3, index = "simpson")
+div_simpR4<- diversity(vegReadyR4, index = "simpson")
+
+inv_simpR1<- diversity(vegReadyR1, index = "invsimpson")
+inv_simpR2<- diversity(vegReadyR2, index = "invsimpson")
+inv_simpR3<- diversity(vegReadyR3, index = "invsimpson")
+inv_simpR4<- diversity(vegReadyR4, index = "invsimpson")
+```
+
+Create DF with round # in one column and diversity in another. 
+```{r}
+library(tidyr)
+ForestR1<- unique(divVeganR1$ForestName)
+shanDivR1<- as.data.frame(cbind(div_shanR1, ForestR1))
+ForestR2<- unique(divVeganR2$ForestName)
+shanDivR2<- as.data.frame(cbind(div_shanR2, ForestR2))
+ForestR3<- unique(divVeganR3$ForestName)
+shanDivR3<- as.data.frame(cbind(div_shanR3, ForestR3))
+ForestR4<- unique(divVeganR4$ForestName)
+shanDivR4<- as.data.frame(cbind(div_shanR4, ForestR4))
+
+```
+
+Plot bar graph of Shannon Index Diversity
+```{r}
+shanDivR1$Type<- as.factor(c("D","P","D","D","P","P"))
+shanDivR1$div_shan<- as.numeric(as.character(shanDivR1$div_shanR1))
+ggplot(shanDivR1, aes(x= ForestR1, y = div_shan, group = Type, color = Type)) + 
+     geom_col(position= "dodge")+ 
+     xlab("Forest") +
+     ylab("Shannon Diversity Index")
+
+ggsave("Shannon_Diversity_Index_ForestR1.jpg", device= "jpg")
+write.csv(shanDivR1, file = "ShanDivForestR1.csv")
+
+shanDivR2$Type<- as.factor(c("D","P","D","D","P","P"))
+shanDivR2$div_shan<- as.numeric(as.character(shanDivR2$div_shanR2))
+ggplot(shanDivR2, aes(x= ForestR2, y = div_shan, group = Type, color = Type)) + 
+     geom_col(position= "dodge")+ 
+     xlab("Forest") +
+     ylab("Shannon Diversity Index") 
+
+ggsave("Shannon_Diversity_Index_ForestR2.jpg", device= "jpg")
+write.csv(shanDivR2, file = "ShanDivForestR2.csv")
+
+shanDivR3$Type<- as.factor(c("P","D","D","P","P"))
+shanDivR3$div_shan<- as.numeric(as.character(shanDivR3$div_shanR3))
+ggplot(shanDivR3, aes(x= ForestR3, y = div_shan, group = Type, color = Type)) + 
+     geom_col(position= "dodge")+ 
+     xlab("Forest") +
+     ylab("Shannon Diversity Index")
+
+ggsave("Shannon_Diversity_Index_ForestR3.jpg", device= "jpg")
+write.csv(shanDivR3, file = "ShanDivForestR3.csv")
+
+shanDivR4$Type<- as.factor(c("D","P","D","D","P","P"))
+shanDivR4$div_shan<- as.numeric(as.character(shanDivR4$div_shanR4))
+ggplot(shanDivR4, aes(x= ForestR4, y = div_shan, group = Type, color = Type)) + 
+     geom_col(position= "dodge")+ 
+     xlab("Forest") +
+     ylab("Shannon Diversity Index")
+
+ggsave("Shannon_Diversity_Index_ForestR4.jpg", device= "jpg")
+write.csv(shanDivR4, file = "ShanDivForestR4.csv")
+```
+
+Do the same for Simpson's Index
+```{r}
+simpDivR1<-as.data.frame(cbind(div_simpR1, ForestR1))
+simpDivR1$Type<- as.factor(c("D","P","D","D","P","P"))
+
+simpDivR1$div_simp<- as.numeric(as.character(simpDivR1$div_simpR1))
+ggplot(simpDivR1, aes(x= ForestR1, y = div_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Forest") +
+     ylab("Simpson's Diversity Index")
+
+ggsave("Simpson's_Diversity_Index_ForestR1.jpg", device = "jpg")
+write.csv(simpDivR1, file = "SimpDivForestR1.csv")
+
+simpDivR2<-as.data.frame(cbind(div_simpR2, ForestR2))
+simpDivR2$Type<- as.factor(c("D","P","D","D","P","P"))
+
+simpDivR2$div_simp<- as.numeric(as.character(simpDivR2$div_simpR2))
+ggplot(simpDivR2, aes(x= ForestR2, y = div_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Forest") +
+     ylab("Simpson's Diversity Index")
+
+ggsave("Simpson's_Diversity_Index_ForestR2.jpg", device = "jpg")
+write.csv(simpDivR2, file = "SimpDivForestR2.csv")
+
+simpDivR3<-as.data.frame(cbind(div_simpR3, ForestR3))
+simpDivR3$Type<- as.factor(c("P","D","D","P","P"))
+
+simpDivR3$div_simp<- as.numeric(as.character(simpDivR3$div_simpR3))
+ggplot(simpDivR3, aes(x= ForestR3, y = div_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Forest") +
+     ylab("Simpson's Diversity Index")
+
+ggsave("Simpson's_Diversity_Index_ForestR3.jpg", device = "jpg")
+write.csv(simpDivR3, file = "SimpDivForestR3.csv")
+
+simpDivR4<-as.data.frame(cbind(div_simpR4, ForestR4))
+simpDivR4$Type<- as.factor(c("D","P","D","D","P","P"))
+
+simpDivR4$div_simp<- as.numeric(as.character(simpDivR4$div_simpR4))
+ggplot(simpDivR4, aes(x= ForestR4, y = div_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Forest") +
+     ylab("Simpson's Diversity Index")
+
+ggsave("Simpson's_Diversity_Index_ForestR4.jpg", device = "jpg")
+write.csv(simpDivR4, file = "SimpDivForestR4.csv")
+
+```
+
+Inverse Simpson's Index
+```{r}
+InvSimpR1<-as.data.frame(cbind(inv_simpR1, ForestR1))
+InvSimpR1$Type<- as.factor(c("D","P","D","D","P","P"))
+
+InvSimpR1$inv_simp<- as.numeric(as.character(InvSimpR1$inv_simpR1))
+ggplot(InvSimpR1, aes(x= ForestR1, y = inv_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Forest") +
+     ylab("Inverse Simpson's Diversity Index")
+
+ggsave("Inv_Simpson's_Diversity_Index_ForestR1.jpg", device = "jpg")
+write.csv(InvSimpR1, file = "InvSimpForestR1.csv")
+
+InvSimpR2<-as.data.frame(cbind(inv_simpR2, ForestR2))
+InvSimpR2$Type<- as.factor(c("D","P","D","D","P","P"))
+
+InvSimpR2$inv_simp<- as.numeric(as.character(InvSimpR2$inv_simpR2))
+ggplot(InvSimpR2, aes(x= ForestR2, y = inv_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Forest") +
+     ylab("Inverse Simpson's Diversity Index")
+
+ggsave("Inv_Simpson's_Diversity_Index_ForestR2.jpg", device = "jpg")
+write.csv(InvSimpR2, file = "InvSimpForestR2.csv")
+
+InvSimpR3<-as.data.frame(cbind(inv_simpR3, ForestR3))
+InvSimpR3$Type<- as.factor(c("P","D","D","P","P"))
+
+InvSimpR3$inv_simp<- as.numeric(as.character(InvSimpR3$inv_simpR3))
+ggplot(InvSimpR3, aes(x= ForestR3, y = inv_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Forest") +
+     ylab("Inverse Simpson's Diversity Index")
+
+ggsave("Inv_Simpson's_Diversity_Index_ForestR3.jpg", device = "jpg")
+write.csv(InvSimpR3, file = "InvSimpForestR3.csv")
+
+InvSimpR4<-as.data.frame(cbind(inv_simpR4, ForestR4))
+InvSimpR4$Type<- as.factor(c("D","P","D","D","P","P"))
+
+InvSimpR4$inv_simp<- as.numeric(as.character(InvSimpR4$inv_simpR4))
+ggplot(InvSimpR4, aes(x= ForestR4, y = inv_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Forest") +
+     ylab("Inverse Simpson's Diversity Index")
+
+ggsave("Inv_Simpson's_Diversity_Index_ForestR4.jpg", device = "jpg")
+write.csv(InvSimpR4, file = "InvSimpForestR4.csv")
+```
+
+
+
+
+
+
+
+
+Calculate diversity per camera per season 
+```{r}
+rm(list = ls())
+library(dplyr)
+library(ggplot2)
+library(readr)
+
+DF<- read_csv("~/Documents/Kate_ThesisCode/dataFinal.csv")
+#This adds a unique camera ID column to the DF, which will be important when you are calculating diversity per camera per season. This column takes the unit#_SD#_forest
+DF$CamID<-substr(DF$Imj1, 1,8)
+
+dump<-which(DF$choice == "NOTHINGHERE" | DF$choice == "SOMETHINGHERE" | DF$choice == "HUMAN" | DF$choice == "GROUSERUFFED" | DF$choice == "CROWORRAVEN" | DF$choice == "OTHERBIRD" | DF$choice == "DOMESTICDOG" | DF$choice == "OWL" | DF$choice == "BLUEJAY" | DF$choice == "TURKEY" | DF$choice == "GOOSEWILD")
+
+#now dump
+DF<-DF[-dump,]
+
+Round1<-filter(DF, round==1)
+Round2<- filter(DF, round==2)
+Round3<- filter(DF, round==3)
+Round4<- filter(DF, round==4)
+```
+
+```{r}
+
+diversityR1<-Round1 %>% group_by(CamID, choice) %>% summarise(
+	NumEvents = length(CamID)
+)
+diversityR2<-Round2 %>% group_by(CamID, choice) %>% summarise(
+	NumEvents = length(CamID)
+)
+diversityR3<-Round3 %>% group_by(CamID, choice) %>% summarise(
+	NumEvents = length(CamID)
+)
+diversityR4<-Round4 %>% group_by(CamID, choice) %>% summarise(
+	NumEvents = length(CamID)
+)
+
+library(tidyr)
+divVeganR1<- spread(diversityR1, choice, NumEvents)
+divVeganR2<- spread(diversityR2, choice, NumEvents)
+divVeganR3<- spread(diversityR3, choice, NumEvents)
+divVeganR4<- spread(diversityR4, choice, NumEvents)
+```
+
+Now, for vegan, replace NA's with zero and also delete the first column.
+```{r}
+#replace NAs with zeros
+divVeganR1[is.na(divVeganR1)] <- 0
+divVeganR2[is.na(divVeganR2)] <- 0
+divVeganR3[is.na(divVeganR3)] <- 0
+divVeganR4[is.na(divVeganR4)] <- 0
+
+#dump first column
+vegReadyR1<-divVeganR1[,-1]
+vegReadyR2<-divVeganR2[,-1]
+vegReadyR3<-divVeganR3[,-1]
+vegReadyR4<-divVeganR4[,-1]
+```
+
+Run the diversity function for shannon diveristy index (increases as diversity increases)
+```{r}
+div_shanR1<-diversity(vegReadyR1, index = "shannon")
+div_shanR2<-diversity(vegReadyR2, index = "shannon")
+div_shanR3<-diversity(vegReadyR3, index = "shannon")
+div_shanR4<-diversity(vegReadyR4, index = "shannon")
+```
+
+Do the same for the simpson's index (similarity index- take 1-S to find diversity index). Measurement of probability that any two randomly selected individuals from infinitely large community will belong to same species.
+```{r}
+div_simpR1<- diversity(vegReadyR1, index = "simpson")
+div_simpR2<- diversity(vegReadyR2, index = "simpson")
+div_simpR3<- diversity(vegReadyR3, index = "simpson")
+div_simpR4<- diversity(vegReadyR4, index = "simpson")
+
+inv_simpR1<- diversity(vegReadyR1, index = "invsimpson")
+inv_simpR2<- diversity(vegReadyR2, index = "invsimpson")
+inv_simpR3<- diversity(vegReadyR3, index = "invsimpson")
+inv_simpR4<- diversity(vegReadyR4, index = "invsimpson")
+```
+
+Create DF with round # in one column and diversity in another. 
+```{r}
+library(tidyr)
+CamsR1<- unique(divVeganR1$CamID)
+shanDivR1<- as.data.frame(cbind(div_shanR1, CamsR1))
+CamsR2<- unique(divVeganR2$CamID)
+shanDivR2<- as.data.frame(cbind(div_shanR2, CamsR2))
+CamsR3<- unique(divVeganR3$CamID)
+shanDivR3<- as.data.frame(cbind(div_shanR3, CamsR3))
+CamsR4<- unique(divVeganR4$CamID)
+shanDivR4<- as.data.frame(cbind(div_shanR4, CamsR4))
+
+```
+
+Plot bar graph of Shannon Index Diversity
+```{r}
+shanDivR1$Type<- as.factor(c("D","P", "P", "D","D","P","D", "P", "D", "P", "D", "D", "D","D", "P", "P", "P", "P", "P"))
+shanDivR1$div_shan<- as.numeric(as.character(shanDivR1$div_shanR1))
+ggplot(shanDivR1, aes(x= CamsR1, y = div_shan, group = Type, color = Type)) + 
+     geom_col(position= "dodge")+ 
+     xlab("Camera") +
+     ylab("Shannon Diversity Index")
+
+ggsave("Shannon_Diversity_Index_CamsR1.jpg", device= "jpg")
+write.csv(shanDivR1, file = "ShanDivCamsR1.csv")
+
+shanDivR2$Type<- as.factor(c("P", "D","P","P", "D","D","P","D", "P","D", "P", "D","D","D","D", "P","P","D","P","P","P"))
+shanDivR2$div_shan<- as.numeric(as.character(shanDivR2$div_shanR2))
+ggplot(shanDivR2, aes(x= CamsR2, y = div_shan, group = Type, color = Type)) + 
+     geom_col(position= "dodge")+ 
+     xlab("Camera") +
+     ylab("Shannon Diversity Index") 
+
+ggsave("Shannon_Diversity_Index_CamsR2.jpg", device= "jpg")
+write.csv(shanDivR2, file = "ShanDivCamsR2.csv")
+
+shanDivR3$Type<- as.factor(c("D","D","P", "P","D","D", "P","P","P","D"))
+shanDivR3$div_shan<- as.numeric(as.character(shanDivR3$div_shanR3))
+ggplot(shanDivR3, aes(x= CamsR3, y = div_shan, group = Type, color = Type)) + 
+     geom_col(position= "dodge")+ 
+     xlab("Camera") +
+     ylab("Shannon Diversity Index")
+
+ggsave("Shannon_Diversity_Index_CamsR3.jpg", device= "jpg")
+write.csv(shanDivR3, file = "ShanDivCamsR3.csv")
+
+shanDivR4$Type<- as.factor(c("P", "D","P","D","P","P", "D","D", "D", "P","D","D","D","D","D", "P", "P", "P", "P", "D", "P", "P"))
+shanDivR4$div_shan<- as.numeric(as.character(shanDivR4$div_shanR4))
+ggplot(shanDivR4, aes(x= CamsR4, y = div_shan, group = Type, color = Type)) + 
+     geom_col(position= "dodge")+ 
+     xlab("Camera") +
+     ylab("Shannon Diversity Index")
+
+ggsave("Shannon_Diversity_Index_CamsR4.jpg", device= "jpg")
+write.csv(shanDivR4, file = "ShanDivCamsR4.csv")
+```
+
+Do the same for Simpson's Index
+```{r}
+simpDivR1<-as.data.frame(cbind(div_simpR1, CamsR1))
+simpDivR1$Type<- as.factor(c("D","P", "P", "D","D","P","D", "P", "D", "P", "D", "D", "D","D", "P", "P", "P", "P", "P"))
+
+simpDivR1$div_simp<- as.numeric(as.character(simpDivR1$div_simpR1))
+ggplot(simpDivR1, aes(x= CamsR1, y = div_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Camera") +
+     ylab("Simpson's Diversity Index")
+
+ggsave("Simpson's_Diversity_Index_CamsR1.jpg", device = "jpg")
+write.csv(simpDivR1, file = "SimpDivCamsR1.csv")
+
+simpDivR2<-as.data.frame(cbind(div_simpR2, CamsR2))
+simpDivR2$Type<- as.factor(c("P", "D","P","P", "D","D","P","D", "P","D", "P", "D","D","D","D", "P","P","D","P","P","P"))
+
+simpDivR2$div_simp<- as.numeric(as.character(simpDivR2$div_simpR2))
+ggplot(simpDivR2, aes(x= CamsR2, y = div_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Camera") +
+     ylab("Simpson's Diversity Index")
+
+ggsave("Simpson's_Diversity_Index_CamsR2.jpg", device = "jpg")
+write.csv(simpDivR2, file = "SimpDivCamsR2.csv")
+
+simpDivR3<-as.data.frame(cbind(div_simpR3, CamsR3))
+simpDivR3$Type<- as.factor(c("D","D","P", "P","D","D", "P","P","P","D"))
+
+simpDivR3$div_simp<- as.numeric(as.character(simpDivR3$div_simpR3))
+ggplot(simpDivR3, aes(x= CamsR3, y = div_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Camera") +
+     ylab("Simpson's Diversity Index")
+
+ggsave("Simpson's_Diversity_Index_CamsR3.jpg", device = "jpg")
+write.csv(simpDivR3, file = "SimpDivCamsR3.csv")
+
+simpDivR4<-as.data.frame(cbind(div_simpR4, CamsR4))
+simpDivR4$Type<- as.factor(c("P", "D","P","D","P","P", "D","D", "D", "P","D","D","D","D","D", "P", "P", "P", "P", "D", "P", "P"))
+
+simpDivR4$div_simp<- as.numeric(as.character(simpDivR4$div_simpR4))
+ggplot(simpDivR4, aes(x= CamsR4, y = div_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Camera") +
+     ylab("Simpson's Diversity Index")
+
+ggsave("Simpson's_Diversity_Index_CamsR4.jpg", device = "jpg")
+write.csv(simpDivR4, file = "SimpDivCamsR4.csv")
+
+```
+
+Inverse Simpson's Index
+```{r}
+InvSimpR1<-as.data.frame(cbind(inv_simpR1, CamsR1))
+InvSimpR1$Type<- as.factor(c("D","P", "P", "D","D","P","D", "P", "D", "P", "D", "D", "D","D", "P", "P", "P", "P", "P"))
+
+InvSimpR1$inv_simp<- as.numeric(as.character(InvSimpR1$inv_simpR1))
+ggplot(InvSimpR1, aes(x= CamsR1, y = inv_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Camera") +
+     ylab("Inverse Simpson's Diversity Index")
+
+ggsave("Inv_Simpson's_Diversity_Index_CamsR1.jpg", device = "jpg")
+write.csv(InvSimpR1, file = "InvSimpCamsR1.csv")
+
+InvSimpR2<-as.data.frame(cbind(inv_simpR2, CamsR2))
+InvSimpR2$Type<- as.factor(c("P", "D","P","P", "D","D","P","D", "P","D", "P", "D","D","D","D", "P","P","D","P","P","P"))
+
+InvSimpR2$inv_simp<- as.numeric(as.character(InvSimpR2$inv_simpR2))
+ggplot(InvSimpR2, aes(x= CamsR2, y = inv_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Camera") +
+     ylab("Inverse Simpson's Diversity Index")
+
+ggsave("Inv_Simpson's_Diversity_Index_CamsR2.jpg", device = "jpg")
+write.csv(InvSimpR2, file = "InvSimpCamsR2.csv")
+
+InvSimpR3<-as.data.frame(cbind(inv_simpR3, CamsR3))
+InvSimpR3$Type<- as.factor(c("D","D","P", "P","D","D", "P","P","P","D"))
+
+InvSimpR3$inv_simp<- as.numeric(as.character(InvSimpR3$inv_simpR3))
+ggplot(InvSimpR3, aes(x= CamsR3, y = inv_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Camera") +
+     ylab("Inverse Simpson's Diversity Index")
+
+ggsave("Inv_Simpson's_Diversity_Index_CamsR3.jpg", device = "jpg")
+write.csv(InvSimpR3, file = "InvSimpCamsR3.csv")
+
+InvSimpR4<-as.data.frame(cbind(inv_simpR4, CamsR4))
+InvSimpR4$Type<- as.factor(c("P", "D","P","D","P","P", "D","D", "D", "P","D","D","D","D","D", "P", "P", "P", "P", "D", "P", "P"))
+
+InvSimpR4$inv_simp<- as.numeric(as.character(InvSimpR4$inv_simpR4))
+ggplot(InvSimpR4, aes(x= CamsR4, y = inv_simp, group = Type, color = Type)) + 
+     geom_col(position= "dodge") +
+     xlab("Camera") +
+     ylab("Inverse Simpson's Diversity Index")
+
+ggsave("Inv_Simpson's_Diversity_Index_CamsR4.jpg", device = "jpg")
+write.csv(InvSimpR4, file = "InvSimpCamsR4.csv")
+```
+
+Let's make some graphs
+```{r}
+Diversity_total <- read_csv("~/Documents/Kate_ThesisCode/Diversity_total.csv")
+
+Diversity_total$BC<-replace(Diversity_total$BC, is.na(Diversity_total$BC), 0)
+Diversity_total$Season<-factor(Diversity_total$Season,c(1,2,3,4), labels = c("Winter", "Spring", "Summer", "Fall"))
+
+BC<-ggplot(Diversity_total, aes(x= Season, y = BC, fill = Diversity_Indices)) + 
+     geom_bar(stat = "identity",position= position_dodge(), width = 0.7) + labs(title = "Beaver Creek", x= "Season", y= "Diversity Indices") + theme (plot.title =element_text(hjust = 0.5))
+BC<- BC + coord_cartesian(ylim = c(0,14))
+
+SH<-ggplot(Diversity_total, aes(x= Season, y = SH, fill = Diversity_Indices)) + 
+     geom_bar(stat = "identity",position= position_dodge(), width = 0.7) +
+    labs(title = "South Hammond", x= "Season", y= "Diversity Indices") + theme (plot.title =element_text(hjust = 0.5))
+SH<- SH + coord_cartesian(ylim = c(0,14))
+
+DON<-ggplot(Diversity_total, aes(x= Season, y = DON, fill = Diversity_Indices)) + 
+     geom_bar(stat = "identity",position= position_dodge(), width = 0.7) +
+    labs(title = "Donnerville", x= "Season", y= "Diversity Indices") + theme (plot.title =element_text(hjust = 0.5))
+DON<- DON + coord_cartesian(ylim = c(0,14)) 
+
+DEG<-ggplot(Diversity_total, aes(x= Season, y = DEG, fill = Diversity_Indices)) + 
+     geom_bar(stat = "identity",position= position_dodge(), width = 0.7) +
+     labs(title = "Degrasse", x= "Season", y= "Diversity Indices") + theme (plot.title =element_text(hjust = 0.5))
+DEG<- DEG + coord_cartesian(ylim = c(0,14))
+
+WF<-ggplot(Diversity_total, aes(x= Season, y = WF, fill = Diversity_Indices)) + 
+     geom_bar(stat = "identity",position= position_dodge(), width = 0.7) +
+     labs(title = "Whiskey Flats", x= "Season", y= "Diversity Indices") + theme (plot.title =element_text(hjust = 0.5))
+WF<- WF + coord_cartesian(ylim = c(0,14))
+WHIP<-ggplot(Diversity_total, aes(x= Season, y = WHIP, fill = Diversity_Indices)) + 
+     geom_bar(stat = "identity",position= position_dodge(), width = 0.7) +
+     labs(title = "Whippoorwill Corners", x= "Season", y= "Diversity Indices") + theme (plot.title =element_text(hjust = 0.5))
+WHIP<- WHIP + coord_cartesian(ylim = c(0,14))
+
+TOTAL<-ggarrange(BC,SH,DON,DEG,WF,WHIP, ncol = 3, nrow = 2, legend = "right", common.legend = TRUE)
+
+
+ggsave("Div_Forests.jpg", device = "jpg")
 ```
 

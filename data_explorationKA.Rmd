@@ -1,0 +1,34 @@
+---
+title: "data exploration"
+author: "Erika"
+date: "4/28/2020"
+output: html_document
+---
+
+SEt up the workspace
+```{r}
+rm(list = ls())
+library(ggplot2)
+library(dplyr)
+```
+
+
+```{r}
+KA<-read.csv("~/Documents/Kate_ThesisCode/Covariates.csv")
+
+LS<-read.csv("/Users/ebar/Dropbox/1Courses/ResearchGroup/2019-2020/Leslie/SYEvariables.csv")
+```
+A little bit of data exploration
+
+```{r}
+summary(KA)
+```
+Also plot
+```{r}
+ggplot(KA, aes(NumDeer))+
+  geom_histogram()
+
+ggplot(KA, aes(P_Water100))+
+  geom_histogram()
+```
+

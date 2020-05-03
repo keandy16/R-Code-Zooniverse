@@ -129,3 +129,50 @@ all_data<-bind_rows(Good_Votes1,checkthesecorrect1)
 write.csv(all_data, file = "all_data.csv")
 ```
 
+
+Once you have generated the "good" and "bad" data frames and combined the two, test the quality of the citizen science data. Some questions to answer: what percent of the data had a propclass>=0.80; how many events were manually classified; and what percent of votes were nothing there or something there? Finally, take a small subset (100 rows) of the "Good_Votes" and double check that work. What percent of those classifications were correct? How much confidence can we have in the data/ our choice of 0.80 propclass.
+```{r}
+New<-random_subset_dataframe(Good_Votes)
+
+#Add in the photo names so you can go back through the images.
+Original <- read_csv("~/Dropbox/Zooniverse_work/files for kate/Zooniverse-work-final/Zoo-Data-Wrangling/Data/north-country-wild-classifications.03.16.20-flattened.csv")
+
+#Select subject_ids and image names columns from Original
+Original1<-select(Original, subject_ids, Imj1, Imj2, Img3)
+
+#There were issues with simply merging the two data frames because there are duplicates from both data frames that need to be corrected. This code corrects any duplicates in subject_id to prepare for merging.
+CheckThese<-select(New, subject_ids)
+CheckThese<-arrange(New, desc(subject_ids))
+CheckThese<- distinct(CheckThese, subject_ids, .keep_all = TRUE)#These three lines of code get the unique subject ids to merge with Original1.
+Original1<-arrange(Original1, desc(subject_ids))
+Original1<-distinct(Original1, subject_ids, .keep_all = TRUE)
+
+#Merge Original1 and CheckThese by subject_ids
+CheckTheseFinal<-merge(Original1, CheckThese, by= "subject_ids")
+
+write.csv(CheckTheseFinal, file="subsetcheck.csv")
+
+#When manually rechecking the subset data, set up data frame so there are six columns: "subject_ids" "Imj1" "Imj2" "Imj3" "choice" and (add in) "Check". Check will have either a "Y" value if your classification matches that of the volunteer's or "N" if you think the classification is incorrect.
+subsetcheck <- read_csv("~/Documents/Kate_ThesisCode/subsetcheck.csv")
+
+#Calculate percent correct of subset group. 
+subsetchecksum<-subsetcheck %>% group_by(Check) %>% summarise(
+  num_yesno= n()
+)
+```
+
+Additional descriptive details on data
+```{r}
+#Determine how many classifications were "NothingHere" and "SomethingHere"
+all_data <- read_csv("~/Documents/Kate_ThesisCode/all_data.csv") #This is all the data before it has been manually processed and unused cameras and photos have been removed
+
+dataFinal <- read_csv("~/Documents/Kate_ThesisCode/dataFinal.csv") #This is the completed df that has removed all cameras that malfunctioned. Use this for the following code.
+
+Choices<- dataFinal %>% group_by(choice) %>% summarise(
+  species= n()
+)
+```
+
+
+
+

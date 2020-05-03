@@ -1,0 +1,112 @@
+---
+title: "Naïve Occupancy Final"
+output: html_notebook
+---
+Naive Occupancy is the percent of cameras at which a species occurs
+
+Use this code to calculate Naive Occupancy. 
+
+Load necessary packages and clear the environment
+```{r}
+rm(list=ls())
+
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(readr)
+library(lubridate)
+library(chron) #works with chronological objects like dates and times
+library(reshape) #restructures and aggregates data in a flexible way
+library(vegan) #ecological analysis
+library(plotrix) #visualize circular data
+library(ggplot2) #producing graphics
+library(maptools) #produce maps using GIS layers
+```
+
+Import the masterDF
+```{r}
+masterDF1 <- read_csv("~/Dropbox/Zooniverse_work/Kate/masterDF.csv")
+masterDF <- read_csv("~/Documents/Kate_ThesisCode/masterDF_test.csv") #masterDF_test.csv is 'masterDF.csv' with manual modifications to add round number to the end of Sampling.Unit.Name. There was an issue with repeating cameras from different rounds not being accounted for. 
+
+masterDF$Sampling.Event<-2020.1
+masterDF$Start.Date<-mdy(masterDF$Start.Date)
+masterDF$End.Date<-mdy(masterDF$End.Date)
+```
+
+Source functions from Wild.ID chapters
+```{r}
+source('~/Dropbox/Zooniverse_work/Camera_Trapping_Ch5_Work/TEAM library 1.7.R')
+```
+
+```{r}
+#masterDF$Start.Date<-mdy(masterDF$Start.Date)
+#masterDF$End.Date<-mdy(masterDF$End.Date)
+masterDF$td.photo<-as.POSIXct(masterDF$td.photo,format="%Y:%m:%d %H:%M:%S")
+masterDF$Photo.Date<-mdy(masterDF$Photo.Date)
+```
+
+
+Naïve Occupancy Calculation
+```{r}
+mat<-f.matrix.creator(masterDF)
+naive_occu_2020<-naive(mat)
+
+```
+Check Naive Occupancy to see if this calculation is correct
+```{r}
+Check<- masterDF %>% group_by(bin) %>% summarise(
+  cams= n_distinct(Sampling.Unit.Name)
+)
+#It looks like the naive occupancy function calculates the values pretty much the same as manual calculation, but not exact enough that I feel confident in this. 
+```
+
+Calculate RAI manually. RAI = events / camera trapping days
+```{r}
+RAI<- masterDF %>% group_by(bin) %>% summarise(
+  cams= n_distinct(Event)
+)
+```
+
+
+```{r}
+events.sp<-event.sp(masterDF, year = 2020.1, thresh = 60)
+```
+
+Calculate Naïve Occupancy per season
+```{r}
+OccWinter<-masterDF %>% group_by(round) %>% filter(round==1)
+OccSpring<- masterDF %>% group_by(round) %>% filter(round==2)
+OccSummer<- masterDF %>% group_by(round) %>% filter(round==3)
+OccFall<-masterDF %>% group_by(round) %>% filter(round==4)
+
+matWinter<-f.matrix.creator(OccWinter)
+naive_occu_2020_W<-naive(matWinter)
+
+
+matSpring<-f.matrix.creator(OccSpring)
+naive_occu_2020_Sp<-naive(matSpring)
+
+matSummer<-f.matrix.creator(OccSummer)
+naive_occu_2020_S<-naive(matSummer)
+
+matFall<-f.matrix.creator(OccFall)
+naive_occu_2020_F<-naive(matFall)
+```
+
+Calculate Naïve Occupancy by forest type
+
+```{r}
+Join<-read_csv("~/Documents/Kate_ThesisCode/dataFinal.csv")
+Join1<-select(Join, "Imj1", "ForestType", "round", "choice")
+masterDFforest<-left_join(masterDF, Join, by = c("Event"= "Imj1", "round", "bin"="choice"))
+
+Pine<-filter(masterDFforest, ForestType == "Pine")
+Deciduous<-filter(masterDFforest, ForestType== "Deciduous")
+
+matPine<-f.matrix.creator(Pine)
+naive_occu_2020_Pine<-naive(matPine)
+
+matDecid<-f.matrix.creator(Deciduous)
+naive_occu_2020_Decid<-naive(matDecid)
+```
+

@@ -92,7 +92,7 @@ multi_choice_colnames <- c("behavior")#determine from View_json call
 
 names(jdata$subject_data)<-c("classification_id", "subject_ids","ForestType", "ForestName", "Image1", "Image2", "Image3", "Camera", "SDCard", "PhotoBatch", "Class_Round" )
 library(plyr)
-combinedData <- join(flattened, subject_data, by='classification_id', type='right', match='all')
+
 ```
 
 #### Now flatten the file
@@ -105,6 +105,9 @@ jdata$classification_id<-as.character(jdata$classification_id)
 flattened <- run_json_parsing(data = jdata) #requires flattening_functions file to be in same folder and sourced.
 #this only works with tidyjson installed.  Need a fix.
 View(flattened)
+survey_id<-as.character(survey_id)
+
+combinedData <- join(flattened, subject_data, by='classification_id', type='right', match='all')
 ```
 Issue - this result gives more rows that the original data file - so we need to figure out why.  I think it is because there are several events for which there was more than one choice made.  Let's check.
 

@@ -1,0 +1,53 @@
+---
+title: "Jaccard Index"
+output: html_notebook
+---
+The purpose of this R Notebook is to calculate the Jaccard Index for all forests in this study. The Jaccard index looks at the similarities between two forests. For the purpose of this script, we will measure the Jaccard index between forests across all seasons.
+
+```{r}
+rm(list=ls())
+
+library(dplyr)
+library(readr)
+
+#Upload the dataset 
+DF<- read.csv("~/Documents/Kate_ThesisCode/dataFinal.csv")
+
+DF$CamID<-substr(DF$Imj1, 1,8)
+
+```
+
+
+
+Source the Jaccard index function
+```{r}
+jaccard <- function(M, user1, user2) {
+  sums = rowSums(M[,c(user1, user2)])
+
+  similarity = length(sums[sums==2])
+  total = length(sums[sums==1]) + similarity
+  
+  similarity/total
+}
+```
+Now calculate the Jaccard Index per forest
+```{r}
+Forest_richness$Number_species<-as.numeric(Forest_richness$Number_species)
+Jaccard<-jaccard(Forest_richness, user1 = "Number_species")
+
+#This function does not seem to work. 
+```
+
+Instead, I will manually calculate using the following formula
+C(J)=a/(a+b+c) where a = the total number of mammals present in both samples, b = the total number of mammals unique to Forest 1, and c = the total number of mammals unique to Forest 2.
+
+
+Display unique mammals per forest 
+```{r}
+Species<- DF %>% group_by(choice, ForestName) %>% summarise(
+  species= n()
+)
+write.csv(Species, file = "SpeciesperForest.csv")
+```
+
+

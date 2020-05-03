@@ -1,0 +1,122 @@
+---
+title: "check_correlations.Rmd"
+author: "Erika"
+date: "4/27/2020"
+output: html_document
+---
+
+Looking at methods for multiple regression modeling for Kate's camera trap data.
+
+set up the workspace
+```{r}
+rm(list = ls())
+library(dplyr)
+library(ggplot2)
+library(Hmisc)
+library(corrplot)
+library(ggcorrplot)
+library(tidyselect)
+
+```
+Load the draft data
+```{r}
+KA<-read.csv("~/Documents/Kate_ThesisCode/Covariates.csv")
+
+LS<-read.csv("/Users/ebar/Dropbox/1Courses/ResearchGroup/2019-2020/Leslie/SYEvariables.csv")
+```
+
+### Kate's data
+Columns 1 - 3 identify the different cameras and are not predictor variables. 
+
+Let's make a DF of the possible **numeric predictor** variables to look for correlations
+
+```{r}
+Kvars<-names(KA)
+remove<-c("Camera", "SD_Card", "Round","ForestType", "Forest","Season", "Cam_Model", "P_Barren50","P_Barren100", "PlotShape50", "PlotShape100")
+Kvars<-Kvars[!Kvars %in% remove]
+
+KPreds<-KA %>% select((Kvars))
+```
+Now I need a correlation matrix of the variables
+
+```{r}
+cor_tests<-cor(KPreds, method = "pearson", use = "complete.obs")
+cor_tests<-round(cor_tests, 2)
+```
+Now to get p-values, need hmisc package
+```{r}
+Kresult<-rcorr(as.matrix(KPreds)) #rcorr is a hmisc function
+
+```
+Now flatten to get easier to understand results
+```{r}
+flattenCorrMatrix<-function(cormat,pmat){
+  ut<-upper.tri(cormat)
+  data.frame(
+    row = rownames (cormat)[row(cormat) [ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor = (cormat)[ut],
+    p = pmat[ut]
+  )
+}
+```
+Now use
+```{r}
+Kres_tab<-flattenCorrMatrix(Kresult$r, Kresult$P)
+Khigh_cor<-filter(Kres_tab, cor >= 0.7 | cor <= -0.7 )
+```
+#### Now Visualize
+
+Draw a correlogram with corrplot package
+
+```{r}
+corrplot(cor_tests, type = "lower", order = "hclust", tl.col = "black", tl.srt = 45)
+```
+Use ggcorrplot
+http://www.sthda.com/english/wiki/ggcorrplot-visualization-of-a-correlation-matrix-using-ggplot2
+
+```{r}
+ggcorrplot(Kresult$r, hc.order = TRUE, type = "lower", lab = TRUE, outline.col = "white", p.mat = Kresult$P, insig = "blank" )
+```
+
+### Leslie's data
+
+Let's make a DF of the possible **numeric predictor** variables to look for correlations. Also get rid of numeric vars that have 0 value to avoid NA problems later.
+
+```{r}
+Lvars<-names(LS)
+remove<-c("Forest", "Plot", "Forest_type", "Lakes_500","Residential_1km","Lakes_1km")
+Lvars<-Lvars[!Lvars %in% remove]
+
+LPreds<-LS %>% select(all_of(Lvars))
+```
+Now I need a correlation matrix of the variables
+
+```{r}
+Lcor_tests<-cor(LPreds, method = "pearson", use = "complete.obs")
+Lcor_tests<-round(Lcor_tests, 2)
+```
+Now to get p-values, need hmisc package
+```{r}
+Lresult<-rcorr(as.matrix(LPreds)) #rcorr is a hmisc function
+```
+
+Now use flatten function
+```{r}
+Lres_tab<-flattenCorrMatrix(Lresult$r, Lresult$P)
+Lhigh_cor<-filter(Lres_tab, cor >= 0.7 | cor <= -0.7)
+```
+#### Now Visualize
+
+Draw a correlogram with corrplot package
+
+```{r}
+corrplot(Lcor_tests, type = "upper", order = "hclust", tl.col = "black", tl.srt = 45)
+```
+Use ggcorrplot
+http://www.sthda.com/english/wiki/ggcorrplot-visualization-of-a-correlation-matrix-using-ggplot2
+
+```{r}
+ggcorrplot(Lresult$r, hc.order = TRUE, type = "lower", lab = TRUE, outline.col = "white", p.mat = Lresult$P, insig = "blank" )
+```
+

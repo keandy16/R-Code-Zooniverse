@@ -21,6 +21,7 @@ library(reshape2)
 #Upload the dataset 
 joinedData <- read_csv("Camera_Trapping_Ch5_Work/joinedData.csv")
 
+
 #quick overview of the dataset 
 str(joinedData)
 
