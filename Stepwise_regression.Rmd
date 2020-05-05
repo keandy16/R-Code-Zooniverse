@@ -1,0 +1,119 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+Code for stepwise regression in R
+
+Prep the workspace
+```{r}
+rm(list = ls())
+library(MASS)
+library(caret)
+library(dplyr)
+```
+Load the draft data
+```{r}
+KA<-read.csv("Covariates.csv")
+
+#LS<-read.csv("/Users/ebar/Dropbox/1Courses/ResearchGroup/2019-2020/Leslie/SYEvariables.csv")
+```
+Deal with NA's.
+
+Stepwise regression won't work well if you have different amounts of data for the different regression runs.  Thus, we need a data set with the same data for each regression model. In Kate's data, there are some cameras for which there were no species detected.  We will delete them from the data set.
+```{r}
+dump<-which(is.na(KA$SpecRichness))
+KA<-KA[-dump,]
+```
+
+Isolate response and predictor variables
+```{r}
+Kresponse<-KA[, c(7: 8, 18:19)]
+Kpreds<- KA[, c(4, 6, 9:17, 21:57)]
+Kpreds<- dplyr::select(Kpreds, -starts_with("P_Barren"))
+Kpreds<-dplyr:: select(Kpreds, -starts_with("PlotShape"))
+
+```
+Now if there are any predictors remaining for which there are NA's, we should remove them from the predictor list. Use dplyr to find them.
+
+```{r}
+haveNAs<-Kpreds %>% select_if(function(x) any(is.na(x))) %>% names()
+#returns column names that contain NAs
+```
+Now remove those columns from Kpreds
+```{r}
+Kpreds<-dplyr::select(Kpreds, - all_of(haveNAs))
+```
+
+Now let's run a stepwise regression
+
+Set seed for reproducibility
+```{r}
+set.seed(123)
+```
+Using MASS
+
+```{r}
+full.model<-glm(Kresponse$SpecRichness ~ ., data = Kpreds)
+step.model<-stepAIC(full.model, direction = "both", trace = FALSE)
+summary(step.model)
+
+```
+Using a second approach to get different outputs using the train() function from caret package.
+
+Another approach following [this website](https://www.statology.org/stepwise-regression-r/)
+
+Start by defining the intercept-only model
+```{r}
+m.intercept_only<-glm(Kresponse$SpecRichness ~ 1, data = Kpreds)
+```
+Define the total model
+```{r}
+m.total<-lm(Kresponse$SpecRichness ~ ., data = Kpreds)
+```
+Perform stepwise regression
+```{r}
+m.stepwise<-step(m.intercept_only, direction = "both", scope = formula(m.total))
+```
+Now run the final model
+```{r}
+m.final<-lm(Kresponse$SpecRichness ~ Season + P_Wetland50 + Cam_Orient + Elevation50, data = Kpreds)
+summary(m.final)
+```
+All subsets regression.  See [this webpage](https://educationalresearchtechniques.com/2017/02/24/subset-regression-in-r/)
+
+```{r}
+library(leaps)
+m.all_subsets<-regsubsets(Kresponse$SpecRichness ~ ., data = Kpreds)
+all_summary<-summary(m.all_subsets)
+plot(m.all_subsets, scale = "r2")
+```
+Plot some results for model comparison
+```{r}
+#base plotting
+par(mfrow = c(1,2))
+plot(all_summary$cp)
+plot(m.all_subsets,scale = "Cp")
+```
+
+Image on left suggests that a model with 3 predictors is best, but doesn't tell which four. Image on the right tells which 3 to select.
+
+```{r}
+plot(m.all_subsets, scale = "Cp")
+```
+Shows that spring, winter, and Slope50 are best in model.
+
+And now use bayesian information criterion BIC
+```{r}
+plot(all_summary$bic)
+```
+
+```{r}
+plot(m.all_subsets, scale = "bic")
+```
+BIC indicates a 2 or 3 feature model is best, and chooses season spring, season winter, and Slope50 as best.
+
+```{r}
+Test<- glm(formula = Kresponse$SpecRichness ~ Season, data = Kpreds)
+Test
+```
+

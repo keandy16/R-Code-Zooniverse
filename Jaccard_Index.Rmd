@@ -50,4 +50,25 @@ Species<- DF %>% group_by(choice, ForestName) %>% summarise(
 write.csv(Species, file = "SpeciesperForest.csv")
 ```
 
+```{r}
+DF<-read_csv("Jaccard_Index.csv")
+DF<- DF[1:9, 1:3]
+DF$Deciduous<-as.numeric(DF$Deciduous)
+DF$Pine<-as.numeric(DF$Pine)
+DF$Mix<-as.numeric(DF$Mix)
+JaccardDecid<- DF[1:6,1]
+JaccardPine<-DF[1:6,2]
+JaccardMix<- DF[1:9,3]
+
+Decid<-mean(JaccardDecid$Deciduous)
+Decid1<-sd(JaccardDecid$Deciduous)
+Pine<-mean(JaccardPine$Pine)
+Pine1<-sd(JaccardPine$Pine)
+Mix<-mean(JaccardMix$Mix)
+Mix1<-sd(JaccardMix$Mix)
+
+Decidsum<-summarise(JaccardDecid, meanDecid = mean("Deciduous"), sdDecid = sd("Deciduous")) 
+Pinesum<- summarise(JaccardPine, meanPine = mean("Pine"), sdPine= sd("Pine"))
+Mixsum<-summarise(JaccardMix, meanMix = mean("Mix"), sdMix = sd("Mix"))
+```
 

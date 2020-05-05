@@ -1,0 +1,156 @@
+---
+title: "Species Richness "
+output: html_notebook
+---
+
+The goal of this R Notebook is to calculate species richness from the data generated in Zooniverse. 
+
+```{r}
+#Basic Parameters 
+rm(list = ls())
+library(dplyr)
+library(ggplot2)
+library(readr)
+
+#Upload the dataset 
+DF<- read.csv("~/Documents/Kate_ThesisCode/dataFinal.csv")
+
+DF$CamID<-substr(DF$Imj1, 1,8)
+
+#Quick glimpse of the data
+glimpse(DF)
+```
+
+Now get rid of the "NOTHINGHERE" and "SOMETHINGHERE" and other species that are not mammals since they provide no species information.
+
+```{r}
+dump<-which(DF$choice == "NOTHINGHERE" | DF$choice == "SOMETHINGHERE" | DF$choice == "HUMAN" | DF$choice == "GROUSERUFFED" | DF$choice == "CROWORRAVEN" | DF$choice == "OTHERBIRD" | DF$choice == "DOMESTICDOG" | DF$choice == "OWL" | DF$choice == "BLUEJAY" | DF$choice == "TURKEY" | DF$choice == "GOOSEWILD")
+
+#now dump
+DF<-DF[-dump,]
+```
+
+Total species richness for all 6 forests
+```{r}
+TOT_richness <- DF %>% group_by(ForestType) %>% summarise(
+  Number_distinct_species = n_distinct(choice),
+  Species_observed = n()
+)
+
+```
+
+Species Richness per Forest 
+```{r}
+Forest_richness <- DF %>% group_by(ForestName) %>% summarise(
+  Number_species = n_distinct(choice)
+  )
+
+```
+
+Species Richness by camera 
+```{r}
+Camera_richness <- DF %>% group_by(CamID, round) %>% summarise(
+  Number_species = n_distinct(choice)
+  )
+
+```
+
+Graph 
+```{r}
+#Number of species observed 
+ggplot(DF, aes(x = choice, fill = ForestType)) + geom_histogram(stat = "count", position = "dodge") + theme_bw() + theme(
+  axis.text.x = element_text(angle = 90, size = 10, vjust = 0.5)
+)
+
+```
+
+Overall species richness among all forests in all seasons
+```{r}
+Choices<- DF %>% group_by(choice) %>% summarise(
+  species= n()
+)
+```
+
+Deer count per camera
+```{r}
+Deer<-filter(DF, choice== "DEERWHITETAILED")
+DeerNum<- Deer %>% group_by(CamID, round) %>% summarise(
+  species= n()
+)
+```
+
+Fisher count per camera
+```{r}
+Fisher<-filter(DF, choice== "FISHER")
+FisherNum<- Fisher %>% group_by(CamID, round) %>% summarise(
+  species= n()
+)
+```
+
+Black Bear count per camera
+```{r}
+Bear<-filter(DF, choice== "BLACKBEAR")
+BearNum<- Bear %>% group_by(CamID, round) %>% summarise(
+  species= n()
+)
+```
+
+Red Fox count per camera
+```{r}
+Fox<-filter(DF, choice== "FOXRED")
+FoxNum<- Fox %>% group_by(CamID, round) %>% summarise(
+  species= n()
+)
+```
+
+Graph species richness per forest per season and color by forest type 
+```{r}
+ForestSeason<- DF %>% group_by(ForestName, round, ForestType) %>% summarise(
+  Species = n_distinct(choice)
+)
+
+
+ggplot(ForestSeason, aes(x= round, y = Species, group = ForestType, color = ForestType)) + 
+     geom_col(position= "dodge") +
+     xlab("Forests per Season") +
+     ylab("Species Richness") + facet_grid(col = vars(ForestName))  + labs(fill = "Forest Type")
+
+
+
+ggsave("ForestSeason_SR.jpg", device = "jpg")
+
+```
+
+
+Species richness by season
+```{r}
+Season<- DF %>% group_by(round) %>% summarise(
+  species= n_distinct(choice)
+)
+
+ggplot(Season, aes(x= round, y = species)) + 
+     geom_col(position= "dodge") +
+     xlab("Season") +
+     ylab("Species Richness") 
+
+ggsave("Season_SR.jpg", device = "jpg")
+```
+
+Graph species richness per camera per forest per season and color by forest type
+```{r}
+CamsForestSeason<- DF %>% group_by(CamID, ForestName, round, ForestType) %>% summarise(
+  Species = n_distinct(choice)
+)
+
+
+ggplot(CamsForestSeason, aes(x= round, y = Species, group = ForestType, color = ForestType)) + 
+     geom_col(position= "dodge") +
+     xlab("Forests per Season") +
+     ylab("Species Richness") + 
+  facet_grid(col = vars(ForestName))   +  geom_text(aes(label = CamID), size = 1.5) + labs(fill = "Forest Type")
+
+
+
+
+ggsave("ForestSeason_SR.jpg", device = "jpg")
+```
