@@ -21,6 +21,7 @@ After Photo Data has been Extracted from Zooniverse:
 9. "data_explorationKA.Rmd" takes the list of covariates (file = "Covariates.csv") I generated using GIS, R, Leslie's forest data, and my own field data for each of the cameras in this study and performs summary statistics on the variables. This makes sure that I did not enter in faulty data and all the variables in this list are there for good reason.
 10. "check_correlationsKA.Rmd" finds the variables that have a strong correlation with one another. This helps guide us when we make the regression models in terms of which variables not to put together. 
 11. "Stepwise_regressionKA.Rmd" performs the multivariate regression. 
+12. "ANOVA_KA.Rmd" performs the ANOVA test defining significant relationships between variaibles and species richness and diversity.
 
 
 Other files not really used:
