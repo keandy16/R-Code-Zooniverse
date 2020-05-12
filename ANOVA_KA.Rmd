@@ -1,0 +1,191 @@
+---
+title: "glmAnova.Rmd"
+author: "Erika"
+date: "5/5/2020"
+output: html_document
+---
+```{r}
+rm(list = ls())
+library(MASS)
+library(caret)
+library(dplyr)
+library(ggplot2)
+```
+Load the draft data
+```{r}
+KA<-read.csv("Covariates.csv")
+
+#LS<-read.csv("/Users/ebar/Dropbox/1Courses/ResearchGroup/2019-2020/Leslie/SYEvariables.csv")
+```
+Deal with NA's.
+
+Stepwise regression won't work well if you have different amounts of data for the different regression runs.  Thus, we need a data set with the same data for each regression model. In Kate's data, there are some cameras for which there were no species detected.  We will delete them from the data set.
+```{r}
+dump<-which(is.na(KA$SpecRichness))
+KA<-KA[-dump,]
+```
+
+Isolate response and predictor variables
+```{r}
+Kresponse<-KA[, c(7: 8, 18:19)]
+Kpreds<- KA[, c(4, 6, 9:17, 21:57)]
+Kpreds<- dplyr::select(Kpreds, -starts_with("P_Barren"))
+Kpreds<-dplyr:: select(Kpreds, -starts_with("PlotShape"))
+
+```
+Now if there are any predictors remaining for which there are NA's, we should remove them from the predictor list. Use dplyr to find them.
+
+```{r}
+haveNAs<-Kpreds %>% select_if(function(x) any(is.na(x))) %>% names()
+#returns column names that contain NAs
+```
+Now remove those columns from Kpreds
+```{r}
+Kpreds<-dplyr::select(Kpreds, - all_of(haveNAs))
+```
+
+Now let's run a stepwise regression
+
+Set seed for reproducibility
+```{r}
+set.seed(123)
+```
+Let's run a two-way glm ANVOA to compare mean SR between forest type and season.
+
+```{r}
+#Species Richness
+m.two_way<-glm(SpecRichness ~ ForestType * Season, data = KA)
+summary(m.two_way)
+
+#Shannon Diversity
+SH.two_way<-glm(div_shan ~ ForestType * Season, data = KA)
+summary(SH.two_way)
+
+#Inverse Simpson's Diversity
+S.two_way<-glm(inv_simp ~ ForestType * Season, data = KA)
+summary(S.two_way)
+```
+Use aov 
+```{r}
+#Species Richness
+m.aov<-aov(SpecRichness ~ ForestType * Season, data = KA)
+summary(m.aov)
+
+#Shannon Diversity
+SH.aov<-aov(div_shan ~ ForestType * Season, data = KA)
+summary(SH.aov)
+
+#Inverse Simpson's Diversity
+S.aov<-aov(inv_simp ~ ForestType * Season, data = KA)
+summary(S.aov)
+```
+Because the interaction term was non-significant, run model again as 2-way with no interaction term.
+
+```{r}
+#Species Richness
+m.aov1<-aov(SpecRichness ~ ForestType + Season, data = KA)
+summary(m.aov1)
+
+#Shannon Diversity
+SH.aov1<-aov(div_shan ~ ForestType + Season, data = KA)
+summary(SH.aov1)
+
+#Inverse Simpson's Diversity
+S.aov1<-aov(inv_simp ~ ForestType + Season, data = KA)
+summary(S.aov1)
+```
+Now do tukey test to see which seasons are sig dif
+
+```{r}
+#Species Richness
+TukeyHSD(m.aov1)
+
+#Shannon Diversity
+TukeyHSD(SH.aov1)
+
+#Inverse Simpson's Diversity
+TukeyHSD(S.aov1)
+```
+Get means for plots
+```{r}
+#Species Richness
+mymeans<-KA %>% group_by(ForestType, Season) %>% summarize(
+  meanSR= mean(SpecRichness, na.rm = T),
+  sdSR = sd(SpecRichness, na.rm = T), 
+  N= length(SpecRichness)
+)
+mymeans1<-KA %>% group_by(ForestType) %>% summarize(
+  meanSR= mean(SpecRichness, na.rm = T),
+  sdSR = sd(SpecRichness, na.rm = T), 
+  N= length(SpecRichness)
+)
+
+
+#Shannon Diveristy
+mymeansShan<-KA %>% group_by(ForestType, Season) %>% summarize(
+  meanShan= mean(div_shan, na.rm = T),
+  sdShan = sd(div_shan, na.rm = T)
+)
+
+meandecidpineShan<-KA %>% group_by(ForestType) %>% summarize(
+  meanSimp= mean(div_shan, na.rm = T),
+  sdSR = sd(div_shan, na.rm = T), 
+  N= length(div_shan)
+)
+
+#Inverse Simpson's Diversity
+mymeansSimp<-KA %>% group_by(ForestType, Season) %>% summarize(
+  meanSimp= mean(inv_simp, na.rm = T),
+  sdSimp = sd(inv_simp, na.rm = T)
+)
+
+meandecidpineSimp<- KA %>% group_by(ForestType) %>% summarise(
+  meanSimp = mean(inv_simp, na.rm = T),
+  sdSimp = sd(inv_simp, na.rm = T),
+  N = length(div_shan)
+)
+```
+Now plot:
+```{r}
+#Species Richness
+dodge <- position_dodge(width = 0.9)
+
+ggplot(mymeans, aes(ForestType, meanSR, group = Season, fill = Season))+
+  geom_col(position = dodge)+ xlab("Forest Type") + ylab("Mean Species Richness")+
+  geom_errorbar(aes(ymin = meanSR - sdSR, ymax = meanSR+sdSR), position = dodge, width = 0.25)
+
+ggsave("SigMeanSR.jpg", device = "jpg")
+
+#Shannon Diversity
+dodge <- position_dodge(width = 0.9)
+
+Shan<-ggplot(mymeansShan, aes(ForestType, meanShan, group = Season, fill = Season))+
+  geom_col(position = dodge)+ xlab("Forest Type") + ylab("Mean Shannon Diversity")+
+  geom_errorbar(aes(ymin = meanShan - sdShan, ymax = meanShan+sdShan), position = dodge, width = 0.25)
+Shan<- Shan + coord_cartesian(ylim = c(0,5))
+
+ggsave("SigMeanShan.jpg", device = "jpg")
+
+#Inverse Simpson's Diversity
+dodge <- position_dodge(width = 0.9)
+
+Simp<- ggplot(mymeansSimp, aes(ForestType, meanSimp, group = Season, fill = Season))+
+  geom_col(position = dodge)+ xlab("Forest Type") + ylab("Mean Simpson's Diversity")+
+  geom_errorbar(aes(ymin = meanSimp - sdSimp, ymax = meanSimp+sdSimp), position = dodge, width = 0.25)
+Simp<- Simp + coord_cartesian(ylim = c(0,5))
+
+ggsave("SigMeanSimp.jpg", device = "jpg")
+
+library(ggpubr)
+SimpShan<-ggarrange(Simp,Shan, ncol = 2, nrow = 1, legend = "right", common.legend = TRUE)
+SimpShan
+
+ggsave("SimpShanSigMean.jpg", device = "jpg")
+```
+Another way to plot (that might be more informative) is whisker plots
+```{r}
+ggplot(mymeans, aes(ForestType, meanSR, group = Season, fill = Season))+
+  geom_boxplot(position = dodge)+
+  geom_point(position = dodge)
+```
+

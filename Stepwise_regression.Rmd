@@ -21,16 +21,48 @@ Deal with NA's.
 
 Stepwise regression won't work well if you have different amounts of data for the different regression runs.  Thus, we need a data set with the same data for each regression model. In Kate's data, there are some cameras for which there were no species detected.  We will delete them from the data set.
 ```{r}
+#Species Richness
 dump<-which(is.na(KA$SpecRichness))
+KA<-KA[-dump,]
+
+#Shannon Diversity
+dump<-which(is.na(KA$div_shan))
+KA<-KA[-dump,]
+
+#Inverse Simpson's Diversity
+dump<-which(is.na(KA$inv_simp))
 KA<-KA[-dump,]
 ```
 
 Isolate response and predictor variables
 ```{r}
+#Species Richness
 Kresponse<-KA[, c(7: 8, 18:19)]
-Kpreds<- KA[, c(4, 6, 9:17, 21:57)]
+Kpreds<- KA[, c(4, 6, 9:17, 21:56)]
 Kpreds<- dplyr::select(Kpreds, -starts_with("P_Barren"))
 Kpreds<-dplyr:: select(Kpreds, -starts_with("PlotShape"))
+
+#For regression without season 
+Kpreds<- dplyr::select(Kpreds, -starts_with("Season"))
+
+#Shannon Diversity
+Kresponse<-KA[, c(7: 8, 18:19)]
+Kpreds<- KA[, c(4, 6, 9:17, 21:56)]
+Kpreds<- dplyr::select(Kpreds, -starts_with("P_Barren"))
+Kpreds<-dplyr:: select(Kpreds, -starts_with("PlotShape"))
+
+#For regression without season 
+Kpreds<- dplyr::select(Kpreds, -starts_with("Season"))
+
+#Inverse Simpson Diversity
+#Shannon Diversity
+Kresponse<-KA[, c(7: 8, 18:19)]
+Kpreds<- KA[, c(4, 6, 9:17, 21:56)]
+Kpreds<- dplyr::select(Kpreds, -starts_with("P_Barren"))
+Kpreds<-dplyr:: select(Kpreds, -starts_with("PlotShape"))
+
+#For regression without season 
+Kpreds<- dplyr::select(Kpreds, -starts_with("Season"))
 
 ```
 Now if there are any predictors remaining for which there are NA's, we should remove them from the predictor list. Use dplyr to find them.
@@ -64,15 +96,27 @@ Another approach following [this website](https://www.statology.org/stepwise-reg
 
 Start by defining the intercept-only model
 ```{r}
+#Species Richness
 m.intercept_only<-glm(Kresponse$SpecRichness ~ 1, data = Kpreds)
+
+#Shannon Diversity
+m.intercept_only_Shan<-glm(Kresponse$div_shan ~ 1, data = Kpreds)
 ```
 Define the total model
 ```{r}
+#Species Richness
 m.total<-lm(Kresponse$SpecRichness ~ ., data = Kpreds)
+
+#Shannon Diversity
+m.total.Shan<-lm(Kresponse$div_shan ~ ., data = Kpreds)
 ```
 Perform stepwise regression
 ```{r}
+#Species Richness
 m.stepwise<-step(m.intercept_only, direction = "both", scope = formula(m.total))
+
+#Shannon Diversity
+m.stepwise_Shan<-step(m.intercept_only_Shan, direction = "both", scope = formula(m.total.Shan))
 ```
 Now run the final model
 ```{r}
@@ -83,9 +127,21 @@ All subsets regression.  See [this webpage](https://educationalresearchtechnique
 
 ```{r}
 library(leaps)
+
+#Species Richness
 m.all_subsets<-regsubsets(Kresponse$SpecRichness ~ ., data = Kpreds)
 all_summary<-summary(m.all_subsets)
 plot(m.all_subsets, scale = "r2")
+
+#Shannon Divesity
+m.all_subsets_Shan<-regsubsets(Kresponse$div_shan ~ ., data = Kpreds)
+all_summary<-summary(m.all_subsets_Shan)
+plot(m.all_subsets_Shan, scale = "r2")
+
+#Inverse Simpson's Diversity
+m.all_subsets_Simp<-regsubsets(Kresponse$inv_simp ~ ., data = Kpreds)
+all_summary<-summary(m.all_subsets_Simp)
+plot(m.all_subsets_Simp, scale = "r2")
 ```
 Plot some results for model comparison
 ```{r}
@@ -93,12 +149,26 @@ Plot some results for model comparison
 par(mfrow = c(1,2))
 plot(all_summary$cp)
 plot(m.all_subsets,scale = "Cp")
+
+#Shan_Div
+plot(m.all_subsets_Shan,scale = "Cp")
+
+#Inverse Simpson's Diversity
+plot(m.all_subsets_Simp,scale = "Cp")
 ```
 
 Image on left suggests that a model with 3 predictors is best, but doesn't tell which four. Image on the right tells which 3 to select.
 
 ```{r}
+library(ggplot2)
+#Species Richness
 plot(m.all_subsets, scale = "Cp")
+
+#Shan_div
+plot(m.all_subsets_Shan, scale = "Cp")
+
+#Inverse Simpson's Diversity
+plot(m.all_subsets_Simp,scale = "Cp")
 ```
 Shows that spring, winter, and Slope50 are best in model.
 
@@ -108,12 +178,22 @@ plot(all_summary$bic)
 ```
 
 ```{r}
+#Species Richness
 plot(m.all_subsets, scale = "bic")
+
+#Shan_div
+plot(m.all_subsets_Shan, scale = "bic")
+
+#Inv_Simp
+plot(m.all_subsets_Simp, scale = "bic")
 ```
 BIC indicates a 2 or 3 feature model is best, and chooses season spring, season winter, and Slope50 as best.
 
+
+
+
 ```{r}
-Test<- glm(formula = Kresponse$SpecRichness ~ Season, data = Kpreds)
-Test
+Test<-lm(Kresponse$inv_simp ~ Season+P_Forest50, data = Kpreds)
+summary(Test)
 ```
 

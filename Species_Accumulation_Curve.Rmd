@@ -30,7 +30,7 @@ masterDF <- read_csv("~/Documents/Kate_ThesisCode/dataFinal.csv")
 #dataFinal.csv is "joinedData.csv" that was manually cleaned, removing all subjects that we did not want to count (from cameras that misfired or malfunctioned, etc). "dataFinal.csv" also has the actual dates of deployment, shown in the 'Use_End_Date' column based on the notes from "Came_Use_Date.csv". Be sure to remove Lampson Falls from the data frame because we are not using that forest in this study. 
 
 #I needed to do a lot of manual modifications to this data frame. In addition to all the date modifications and camera/image removals, I had to go in an manually adjust some camera names, including changing .jpg to .JPG on the '03_05_SH' Round 3 images. I'm not sure why it did that. To avoid making a bunch of tiny error that become a big deal later on, be sure to really check the field sheets and make sure the main data sets (like Cam_Use_Date and Metadata_Field_Sheet) are correct!
-
+masterDF<-read_csv("masterDF_test.csv") #Use this csv if you want to calculate the total species accumulation curve. This has a column that clearly parses out all cameras (there were two 03_05_SH that cause errors later). Be sure to adjust the code below to fit (i.e. use bin instead of choice, etc)
 ```
 
 Source functions from Wild.ID chapters in console
@@ -49,6 +49,7 @@ masterDF<-masterDF[-dump,]
 
 
 
+
 Calculate camera trap nights
 ```{r}
 masterDF$Date_Out<- mdy(masterDF$Date_Out)
@@ -57,6 +58,20 @@ masterDF$Use_End_Date<-mdy(masterDF$Use_End_Date)
 
 masterDF$Camera_Trap_Days<- difftime(masterDF$Use_End_Date, masterDF$Date_Out , units = c("days"))
 ```
+
+Camera Trap Days
+```{r}
+CamTrapAnalysis<- masterDF %>% group_by(CamNum, SD_card_num, ForestName, round) %>% summarise( camdays = max(Camera_Trap_Days))
+View(CamTrapAnalysis)
+Cam_Days<- sum(CamTrapAnalysis$camdays)
+Cam_Days
+#Time difference of 4472 days. Need to convert to number
+CamDays<-as.numeric(CamTrapAnalysis$camdays)
+TotalTrapDays<-sum(CamDays) #This gives you the number of camera trap days, which is much more reasonable than before. I was adding up all the camera trap days calculated per event not individual camera. 
+
+```
+
+
 
 Need to bring in photo date and time. This will come from the exif data gathered from the photo metadata. Need to merge these files. 
 ```{r}
@@ -108,6 +123,39 @@ SpeciesAccWinter<-SpeciesAcc %>% group_by(round) %>% filter(round==1)
 SpeciesAccSpring<- SpeciesAcc %>% group_by(round) %>% filter(round==2)
 SpeciesAccSummer<- SpeciesAcc %>% group_by(round) %>% filter(round==3)
 SpeciesAccFall<-SpeciesAcc %>% group_by(round) %>% filter(round==4)
+```
+
+If you want to calculate the species accumulation curve for the entire data set, use this code.
+```{r}
+dump<-which(masterDF$bin == "NOTHINGHERE" | masterDF$bin == "SOMETHINGHERE" | masterDF$bin == "HUMAN" | masterDF$bin == "GROUSERUFFED" | masterDF$bin == "CROWORRAVEN" | masterDF$bin == "OTHERBIRD" | masterDF$bin == "DOMESTICDOG" | masterDF$bin == "OWL" | masterDF$bin == "BLUEJAY" | masterDF$bin == "TURKEY" | masterDF$bin == "GOOSEWILD")
+masterDF<-masterDF[-dump,]
+masterDF$Start.Date<- mdy(masterDF$Start.Date)
+masterDF$End.Date<-mdy(masterDF$End.Date)
+masterDF$ndays<- difftime(masterDF$End.Date, masterDF$Start.Date , units = c("days"))
+
+masterDF<-masterDF[,2:11]
+
+
+SpeciesAcc<-masterDF
+SpeciesAcc$Sampling.Event<-2020
+SpeciesAcc<- SpeciesAcc[,-(10)]
+
+
+SpeciesAcc$td.photo<-as.POSIXct(SpeciesAcc$td.photo,format="%Y:%m:%d %H:%M:%S")
+SpeciesAcc$Photo.Date<-mdy(SpeciesAcc$Photo.Date)
+SpeciesAcc$Photo.Time<-hms(SpeciesAcc$Photo.Time)
+
+accumulationTotal<-acc.curve(SpeciesAcc, 2020)
+
+TOTAL<-ggplot(accumulationTotal, aes(x=Camera.trap.days, y=species)) +
+     geom_line(aes(y=species-sd), colour = "grey50", linetype= "dotted")+
+     geom_line(aes(y=species+sd), colour = "grey50", linetype= "dotted")+
+     geom_line() + ylab("Number of Species") + xlab("Camera Trap Days") +
+     theme_bw()+ geom_hline(yintercept = 21, color = "red")
+TOTAL
+
+
+ggsave("Species_Accumulation_Overall.JPG", device = "jpg")
 ```
 
 
